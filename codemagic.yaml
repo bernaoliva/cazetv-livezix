@@ -1,0 +1,124 @@
+# Codemagic CI/CD — Build do CazéTV LiveZix (fork Moblin)
+# Build unsigned (sem Apple Developer Program) — IPA será assinado pelo SideStore
+# no iPhone com Apple ID grátis do usuário no momento da instalação.
+#
+# Free tier Codemagic: 500 min/mês em Mac M2. Suficiente pra 25-30 builds.
+# Setup: https://codemagic.io/start/  → conecta este repo GitHub → build automático.
+
+workflows:
+  livezix-unsigned:
+    name: CazéTV LiveZix — Build unsigned IPA
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    environment:
+      vars:
+        XCODE_PROJECT: "Moblin.xcodeproj"
+        XCODE_SCHEME: "Moblin"
+        CONFIGURATION: "Release"
+        BUILD_DIR: "$CM_BUILD_DIR/build"
+      xcode: latest
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+        - pattern: master
+          include: true
+
+    scripts:
+      - name: Mostrar versões do ambiente
+        script: |
+          set -e
+          echo "=== Xcode ==="; xcodebuild -version
+          echo "=== Swift ==="; swift --version
+          echo "=== macOS ==="; sw_vers
+          echo "=== Diretório ==="; pwd; ls -la
+
+      - name: Adicionar pasta LiveZix ao project.pbxproj (sem Xcode)
+        script: |
+          set -e
+          # Codemagic não tem Xcode UI pra "Add Files" — usa gem xcodeproj pra adicionar
+          # os 5 arquivos Swift de Moblin/LiveZix/ ao target Moblin antes do build.
+          # Idempotente: roda toda vez, mas só altera se algo está faltando.
+          sudo gem install xcodeproj --no-document
+          ruby scripts/add_livezix_files.rb
+
+      - name: Resolver dependências SPM
+        script: |
+          set -e
+          xcodebuild -resolvePackageDependencies \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME"
+
+      - name: Preparar User.xcconfig (signing automático Personal Team)
+        script: |
+          set -e
+          # Codemagic não tem Apple ID local — usamos build unsigned (SideStore re-assina).
+          # User.xcconfig precisa existir senão Base.xcconfig quebra (include obrigatório).
+          if [ ! -f User.xcconfig ]; then
+            cp User.template.xcconfig User.xcconfig
+          fi
+          cat User.xcconfig
+
+      - name: Build unsigned (sem Apple Developer Program)
+        script: |
+          set -e
+          mkdir -p "$BUILD_DIR"
+          # Build pra device iOS REAL (arm64), sem signing — IPA será re-assinado pelo SideStore.
+          # CODE_SIGNING_ALLOWED=NO desativa todo o signing (cert, profile, entitlements).
+          xcodebuild build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$BUILD_DIR" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_BITCODE=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
+
+      - name: Empacotar .app em .ipa (formato Payload/)
+        script: |
+          set -e
+          APP_PATH="$BUILD_DIR/Build/Products/Release-iphoneos/Moblin.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "ERRO: $APP_PATH não encontrado. Lista pasta produtos:"
+            ls -la "$BUILD_DIR/Build/Products/Release-iphoneos/" || true
+            exit 1
+          fi
+          STAGE="$CM_BUILD_DIR/ipa-stage"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE/Payload"
+          cp -R "$APP_PATH" "$STAGE/Payload/"
+          # Remove _CodeSignature/ pra ficar realmente unsigned
+          rm -rf "$STAGE/Payload/Moblin.app/_CodeSignature"
+          cd "$STAGE"
+          zip -qry "$CM_BUILD_DIR/CazeTV-LiveZix-unsigned.ipa" Payload
+          echo "=== IPA gerado ==="
+          ls -lh "$CM_BUILD_DIR/CazeTV-LiveZix-unsigned.ipa"
+          # Resumo do bundle pra confirmar branding
+          /usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" "$STAGE/Payload/Moblin.app/Info.plist" || true
+          /usr/libexec/PlistBuddy -c "Print :CFBundleName" "$STAGE/Payload/Moblin.app/Info.plist" || true
+
+    artifacts:
+      - CazeTV-LiveZix-unsigned.ipa
+      - $BUILD_DIR/Build/Products/Release-iphoneos/Moblin.app
+      # Logs de erro do Xcode em caso de falha
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      email:
+        recipients:
+          # Coloque seu email aqui pra receber notif quando build terminar
+          - boliva@livemode.com
+        notify:
+          success: true
+          failure: true

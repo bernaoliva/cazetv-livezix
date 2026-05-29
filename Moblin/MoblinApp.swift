@@ -13,18 +13,31 @@ struct MoblinApp: App {
 
     var body: some Scene {
         WindowGroup {
-            MainView(
-                webBrowserController: model.webBrowserController,
-                streamView: StreamView(
-                    show: model.show,
-                    cameraPreviewView: CameraPreviewView(model: model),
-                    streamPreviewView: StreamPreviewView(model: model)
-                ),
-                createStreamWizard: model.createStreamWizard,
-                toast: model.toast,
-                orientation: model.orientation,
-                quickButtons: model.database.quickButtonsGeneral
-            )
+            // ── LiveZix CazéTV router ──
+            // Se modo simplificado ativo (default): mostra onboarding (1ª vez) ou MainView LiveZix.
+            // Se rep ativou "Avançado" nas Settings (liveZixMode=false), mostra Moblin completo.
+            Group {
+                if model.database.liveZixMode {
+                    if model.database.liveZixSelectedRep == nil {
+                        LiveZixOnboardingView()
+                    } else {
+                        LiveZixMainView()
+                    }
+                } else {
+                    MainView(
+                        webBrowserController: model.webBrowserController,
+                        streamView: StreamView(
+                            show: model.show,
+                            cameraPreviewView: CameraPreviewView(model: model),
+                            streamPreviewView: StreamPreviewView(model: model)
+                        ),
+                        createStreamWizard: model.createStreamWizard,
+                        toast: model.toast,
+                        orientation: model.orientation,
+                        quickButtons: model.database.quickButtonsGeneral
+                    )
+                }
+            }
             .background(.black)
             .environmentObject(model)
         }

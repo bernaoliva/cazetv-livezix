@@ -1098,6 +1098,12 @@ class Database: Codable, ObservableObject {
     var mediaPlayers: SettingsMediaPlayers = .init()
     @Published var showAllSettings: Bool = false
     @Published var portrait: Bool = false
+    // ── CazéTV LiveZix (fork) ─────────────────────────────────────────────
+    // liveZixMode: quando true, app usa UI simplificada (LiveZixMainView).
+    // false = Moblin original completo. Default true pra rep abrir a versão simplificada.
+    @Published var liveZixMode: Bool = true
+    // Rep escolhido na tela de onboarding (1..12). nil = primeira vez, mostra LiveZixOnboardingView.
+    @Published var liveZixSelectedRep: Int? = nil
     var djiDevices: SettingsDjiDevices = .init()
     var alertsMediaGallery: SettingsAlertsMediaGallery = .init()
     var catPrinters: SettingsCatPrinters = .init()
@@ -1250,7 +1256,9 @@ class Database: Codable, ObservableObject {
              face,
              beauty,
              talkBack,
-             gimbal
+             gimbal,
+             liveZixMode,
+             liveZixSelectedRep
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -1332,6 +1340,8 @@ class Database: Codable, ObservableObject {
         try container.encode(.beauty, beauty)
         try container.encode(.talkBack, talkback)
         try container.encode(.gimbal, gimbal)
+        try container.encode(.liveZixMode, liveZixMode)
+        try container.encode(.liveZixSelectedRep, liveZixSelectedRep)
     }
 
     init() {}
@@ -1463,6 +1473,9 @@ class Database: Codable, ObservableObject {
         beauty = container.decode(.beauty, SettingsBeauty.self, .init())
         talkback = container.decode(.talkBack, SettingsTalkback.self, .init())
         gimbal = container.decode(.gimbal, SettingsGimbal.self, .init())
+        liveZixMode = container.decode(.liveZixMode, Bool.self, true)
+        // Optional Int: usa try? decodeIfPresent direto (extensão custom não cobre Optional de forma segura)
+        liveZixSelectedRep = (try? container.decodeIfPresent(Int.self, forKey: .liveZixSelectedRep)) ?? nil
     }
 }
 

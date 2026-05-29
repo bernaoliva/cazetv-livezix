@@ -11,6 +11,22 @@ struct SettingsView: View {
             if model.isLive {
                 InfoBannerView(text: "Settings that would stop the stream are disabled when live.")
             }
+            // ── CazéTV LiveZix: botão pra voltar pro modo simplificado ──
+            Section {
+                Button {
+                    database.liveZixMode = true
+                    model.storeSettings()
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.uturn.backward.circle.fill")
+                            .foregroundColor(.blue)
+                        Text("Voltar pro modo CazéTV LiveZix simplificado")
+                            .foregroundColor(.primary)
+                    }
+                }
+            } footer: {
+                Text("Esconde todas as opções avançadas do Moblin e volta pra interface simplificada do rep.")
+            }
             Section {
                 NavigationLink {
                     StreamsSettingsView(createStreamWizard: model.createStreamWizard, database: database)

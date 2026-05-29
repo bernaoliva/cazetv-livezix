@@ -95,6 +95,12 @@ Config.xcconfig
 .DS_Store
 __MACOSX
 Config/User.xcconfig
+User.xcconfig
 
 # Node.js
 node_modules/
+
+# Codemagic build artifacts
+*.ipa
+ipa-stage/
+.github/workflows/
