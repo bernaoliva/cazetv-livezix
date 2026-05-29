@@ -50,6 +50,16 @@ workflows:
           fi
           echo "OK — Xcode vai sincronizar automaticamente os 5 arquivos LiveZix."
 
+      - name: Baixar Metal Toolchain (Xcode 26+ não vem com ele por padrão)
+        script: |
+          set -e
+          # Moblin tem shaders .metal (VideoEffects/Dewarp360, Crt, etc) que precisam do
+          # Metal Toolchain pra compilar. Xcode 26 baixa sob demanda.
+          xcodebuild -downloadComponent MetalToolchain || \
+          xcodebuild -downloadAllPlatforms || true
+          # Confirma que ferramenta metal está disponível
+          xcrun --find metal || echo "metal ainda não encontrado, continuando..."
+
       - name: Resolver dependências SPM
         script: |
           set -e
