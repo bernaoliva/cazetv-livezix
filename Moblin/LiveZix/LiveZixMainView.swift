@@ -237,7 +237,7 @@ private struct TorchButton: View {
                 .background(Color.white.opacity(on ? 0.22 : 0.1))
                 .cornerRadius(10)
         }
-        .onAppear { on = model.isTorchOn }
+        .onAppear { on = model.streamOverlay.isTorchOn }
     }
 }
 
