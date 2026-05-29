@@ -3,8 +3,9 @@
 import Foundation
 
 enum LiveZixConfig {
-    /// Total de reps suportados pelo LiveZix server (rep1..rep12 → SRT_LIVEMODE_01..12)
-    static let totalReps = 12
+    /// Total de reps ativos no momento (REP 1..N → SRT_LIVEMODE_01..N).
+    /// Inicialmente 4 (Makito 189.112.178.134:5000-5003). Subir conforme adicionar portas no Makito.
+    static let totalReps = 4
 
     /// URL base do servidor LiveZix (HTTP/HTTPS). Endpoint moblin_creds é exposto aqui.
     static let serverBaseUrl = "https://livezix.livemode.space"
