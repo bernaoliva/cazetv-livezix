@@ -165,50 +165,74 @@ class LiveZixStatusPoller: ObservableObject {
 }
 
 // ─── Controles secundários (mic, lanterna, zoom) ─────────────────
+// Subviews dedicadas evitam ambiguidade do compilador SwiftUI ao
+// passar @Published properties (isTorchOn etc.) inline pra helpers.
 private struct LiveZixSecondaryControls: View {
-    @EnvironmentObject var model: Model
-    @State private var localMuted: Bool = false
-
     var body: some View {
         HStack(spacing: 12) {
-            controlButton(systemImage: "flashlight.on.fill",
-                          isActive: model.isTorchOn) {
-                model.toggleTorch()
-            }
-            controlButton(systemImage: localMuted ? "mic.slash.fill" : "mic.fill",
-                          isActive: localMuted) {
-                localMuted.toggle()
-                model.setMuted(value: localMuted)
-            }
-            zoomButton(value: 0.5)
-            zoomButton(value: 1.0)
-            zoomButton(value: 2.0)
+            TorchButton()
+            MicButton()
+            ZoomButton(value: 0.5)
+            ZoomButton(value: 1.0)
+            ZoomButton(value: 2.0)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(Color.black.opacity(0.42))
         .cornerRadius(14)
-        .onAppear { localMuted = model.isMuteOn }
     }
+}
 
-    @ViewBuilder
-    private func controlButton(systemImage: String, isActive: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
+private struct TorchButton: View {
+    @EnvironmentObject var model: Model
+
+    var body: some View {
+        let active: Bool = model.isTorchOn
+        Button {
+            model.toggleTorch()
+        } label: {
+            Image(systemName: "flashlight.on.fill")
                 .font(.system(size: 18))
-                .foregroundColor(isActive ? .yellow : .white)
+                .foregroundColor(active ? .yellow : .white)
                 .frame(width: 44, height: 44)
-                .background(Color.white.opacity(isActive ? 0.22 : 0.1))
+                .background(Color.white.opacity(active ? 0.22 : 0.1))
                 .cornerRadius(10)
         }
     }
+}
 
-    @ViewBuilder
-    private func zoomButton(value: Double) -> some View {
+private struct MicButton: View {
+    @EnvironmentObject var model: Model
+    @State private var muted: Bool = false
+
+    var body: some View {
+        Button {
+            muted.toggle()
+            model.setMuted(value: muted)
+        } label: {
+            Image(systemName: muted ? "mic.slash.fill" : "mic.fill")
+                .font(.system(size: 18))
+                .foregroundColor(muted ? .yellow : .white)
+                .frame(width: 44, height: 44)
+                .background(Color.white.opacity(muted ? 0.22 : 0.1))
+                .cornerRadius(10)
+        }
+        .onAppear {
+            let val: Bool = model.isMuteOn
+            muted = val
+        }
+    }
+}
+
+private struct ZoomButton: View {
+    @EnvironmentObject var model: Model
+    let value: Double
+
+    var body: some View {
         Button {
             _ = model.setCameraZoomX(x: Float(value))
         } label: {
-            Text("\(format(value))x")
+            Text("\(formatZoom(value))x")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(.white)
                 .frame(width: 44, height: 44)
@@ -217,7 +241,7 @@ private struct LiveZixSecondaryControls: View {
         }
     }
 
-    private func format(_ v: Double) -> String {
+    private func formatZoom(_ v: Double) -> String {
         v == floor(v) ? String(format: "%.0f", v) : String(format: "%.1f", v)
     }
 }
