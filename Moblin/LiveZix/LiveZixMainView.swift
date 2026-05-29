@@ -1,6 +1,15 @@
 // LiveZix CazéTV — fork do Moblin
 // Tela principal simplificada pro rep. Substitui MainView quando liveZixMode=true.
 // Mostra apenas: preview câmera, botão TRANSMITIR, controles essenciais, status central.
+//
+// PADRÃO DE ACESSO AO MODEL:
+// Só a view raiz (LiveZixMainView) usa @EnvironmentObject. Todas as subviews
+// recebem `let model: Model` como propriedade simples — espelha o padrão usado
+// pelo próprio Moblin (ControlBarPortraitView, QuickButtonsView, etc).
+// Motivo: Model é `@MainActor + ObservableObject`. Em Xcode 26+/Swift 5 o
+// dynamic-member lookup via EnvironmentObject Wrapper falha pra @Published
+// dentro de subviews ("requires wrapper EnvironmentObject<Model>.Wrapper").
+// Reactivity de live/torch/mic é mantida via @State local sincronizado.
 import SwiftUI
 
 struct LiveZixMainView: View {
@@ -15,11 +24,11 @@ struct LiveZixMainView: View {
 
             // Camadas de UI overlaid
             VStack(spacing: 0) {
-                LiveZixTopBar()
+                LiveZixTopBar(model: model)
                 Spacer()
-                LiveZixSecondaryControls()
+                LiveZixSecondaryControls(model: model)
                     .padding(.bottom, 14)
-                LiveZixGoLiveButton()
+                LiveZixGoLiveButton(model: model)
                     .padding(.bottom, 20)
             }
 
@@ -60,14 +69,15 @@ struct LiveZixMainView: View {
 
 // ─── Top Bar (status central + bitrate) ──────────────────────────────────
 private struct LiveZixTopBar: View {
-    @EnvironmentObject var model: Model
+    let model: Model
+    @ObservedObject private var live = LiveZixLiveStatePoller.shared
 
     var body: some View {
         HStack(spacing: 10) {
-            LiveZixServerStatusBar()
+            LiveZixServerStatusBar(model: model)
             Spacer()
             HStack(spacing: 8) {
-                if model.isLive {
+                if live.isLive {
                     Circle()
                         .fill(Color.red)
                         .frame(width: 10, height: 10)
@@ -86,11 +96,13 @@ private struct LiveZixTopBar: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 14)
+        .onAppear { live.start(model: model) }
+        .onDisappear { live.stop() }
     }
 
     private func currentStats() -> String {
-        // Não dependemos de campos específicos do Moblin pra evitar incompatibilidade
-        // com diferentes versões. Mostra apenas a resolução/fps configurada do stream.
+        // Não dependemos de campos específicos do Moblin pra evitar incompatibilidade.
+        // Mostra apenas a resolução/fps configurada do stream atual.
         let stream = model.stream
         let res = String(describing: stream.resolution)
             .replacingOccurrences(of: "r", with: "")
@@ -100,7 +112,7 @@ private struct LiveZixTopBar: View {
 
 // ─── Status da Central (Remote Control) ──────────────────────────────────
 struct LiveZixServerStatusBar: View {
-    @EnvironmentObject var model: Model
+    let model: Model
     @ObservedObject private var rc = LiveZixStatusPoller.shared
 
     var body: some View {
@@ -133,8 +145,8 @@ struct LiveZixServerStatusBar: View {
     }
 }
 
-// Poller simples pra checar status de conexão a cada 2s (Moblin não tem publisher pra isso).
-// Model é @MainActor, então todos os acessos têm que rodar no MainActor.
+// Pollers — espelham state observável pro SwiftUI sem depender do @Published do Model
+// (que não atravessa bem a fronteira EnvironmentObject<@MainActor Model> nessa versão).
 @MainActor
 class LiveZixStatusPoller: ObservableObject {
     static let shared = LiveZixStatusPoller()
@@ -147,7 +159,6 @@ class LiveZixStatusPoller: ObservableObject {
         update()
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            // Timer callback roda no main run loop, mas precisa hop pro MainActor via Task
             Task { @MainActor in self?.update() }
         }
     }
@@ -164,17 +175,44 @@ class LiveZixStatusPoller: ObservableObject {
     }
 }
 
+@MainActor
+class LiveZixLiveStatePoller: ObservableObject {
+    static let shared = LiveZixLiveStatePoller()
+    @Published var isLive: Bool = false
+    private var timer: Timer?
+    private weak var model: Model?
+
+    func start(model: Model) {
+        self.model = model
+        update()
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.update() }
+        }
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    private func update() {
+        guard let m = model else { return }
+        let live = m.isLive
+        if isLive != live { isLive = live }
+    }
+}
+
 // ─── Controles secundários (mic, lanterna, zoom) ─────────────────
-// Subviews dedicadas evitam ambiguidade do compilador SwiftUI ao
-// passar @Published properties (isTorchOn etc.) inline pra helpers.
 private struct LiveZixSecondaryControls: View {
+    let model: Model
     var body: some View {
         HStack(spacing: 12) {
-            TorchButton()
-            MicButton()
-            ZoomButton(value: 0.5)
-            ZoomButton(value: 1.0)
-            ZoomButton(value: 2.0)
+            TorchButton(model: model)
+            MicButton(model: model)
+            ZoomButton(model: model, value: 0.5)
+            ZoomButton(model: model, value: 1.0)
+            ZoomButton(model: model, value: 2.0)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -184,25 +222,27 @@ private struct LiveZixSecondaryControls: View {
 }
 
 private struct TorchButton: View {
-    @EnvironmentObject var model: Model
+    let model: Model
+    @State private var on: Bool = false
 
     var body: some View {
-        let active: Bool = model.isTorchOn
         Button {
             model.toggleTorch()
+            on.toggle()
         } label: {
             Image(systemName: "flashlight.on.fill")
                 .font(.system(size: 18))
-                .foregroundColor(active ? .yellow : .white)
+                .foregroundColor(on ? .yellow : .white)
                 .frame(width: 44, height: 44)
-                .background(Color.white.opacity(active ? 0.22 : 0.1))
+                .background(Color.white.opacity(on ? 0.22 : 0.1))
                 .cornerRadius(10)
         }
+        .onAppear { on = model.isTorchOn }
     }
 }
 
 private struct MicButton: View {
-    @EnvironmentObject var model: Model
+    let model: Model
     @State private var muted: Bool = false
 
     var body: some View {
@@ -217,15 +257,12 @@ private struct MicButton: View {
                 .background(Color.white.opacity(muted ? 0.22 : 0.1))
                 .cornerRadius(10)
         }
-        .onAppear {
-            let val: Bool = model.isMuteOn
-            muted = val
-        }
+        .onAppear { muted = model.isMuteOn }
     }
 }
 
 private struct ZoomButton: View {
-    @EnvironmentObject var model: Model
+    let model: Model
     let value: Double
 
     var body: some View {
@@ -248,30 +285,31 @@ private struct ZoomButton: View {
 
 // ─── Botão TRANSMITIR ────────────────────────────────────────────────────
 private struct LiveZixGoLiveButton: View {
-    @EnvironmentObject var model: Model
+    let model: Model
+    @ObservedObject private var live = LiveZixLiveStatePoller.shared
     @State private var presentingStartConfirm = false
     @State private var presentingStopConfirm = false
 
     var body: some View {
         Button {
-            if model.isLive {
+            if live.isLive {
                 presentingStopConfirm = true
             } else {
                 presentingStartConfirm = true
             }
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: model.isLive ? "stop.fill" : "dot.radiowaves.left.and.right")
+                Image(systemName: live.isLive ? "stop.fill" : "dot.radiowaves.left.and.right")
                     .font(.system(size: 24, weight: .bold))
-                Text(model.isLive ? "PARAR" : "TRANSMITIR")
+                Text(live.isLive ? "PARAR" : "TRANSMITIR")
                     .font(.system(size: 18, weight: .bold))
             }
             .foregroundColor(.white)
             .frame(maxWidth: 280)
             .frame(height: 64)
-            .background(model.isLive ? Color.red : Color.green)
+            .background(live.isLive ? Color.red : Color.green)
             .cornerRadius(16)
-            .shadow(color: (model.isLive ? Color.red : Color.green).opacity(0.45), radius: 18, x: 0, y: 0)
+            .shadow(color: (live.isLive ? Color.red : Color.green).opacity(0.45), radius: 18, x: 0, y: 0)
         }
         .confirmationDialog("Começar transmissão?", isPresented: $presentingStartConfirm, titleVisibility: .visible) {
             Button("Transmitir") {
