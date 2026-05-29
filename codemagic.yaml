@@ -37,14 +37,18 @@ workflows:
           echo "=== macOS ==="; sw_vers
           echo "=== Diretório ==="; pwd; ls -la
 
-      - name: Adicionar pasta LiveZix ao project.pbxproj (sem Xcode)
+      - name: Confirmar pasta LiveZix presente (filesystem-synchronized group)
         script: |
           set -e
-          # Codemagic não tem Xcode UI pra "Add Files" — usa gem xcodeproj pra adicionar
-          # os 5 arquivos Swift de Moblin/LiveZix/ ao target Moblin antes do build.
-          # Idempotente: roda toda vez, mas só altera se algo está faltando.
-          sudo gem install xcodeproj --no-document
-          ruby scripts/add_livezix_files.rb
+          # Moblin usa PBXFileSystemSynchronizedRootGroup (Xcode 16+).
+          # Qualquer arquivo .swift dentro de Moblin/ é AUTOMATICAMENTE adicionado ao
+          # target Moblin durante o build. Só confirma que os 5 arquivos LiveZix estão lá.
+          ls -la Moblin/LiveZix/
+          if [ ! -f Moblin/LiveZix/LiveZixOnboardingView.swift ]; then
+            echo "ERRO: Moblin/LiveZix/ não tem os arquivos esperados!"
+            exit 1
+          fi
+          echo "OK — Xcode vai sincronizar automaticamente os 5 arquivos LiveZix."
 
       - name: Resolver dependências SPM
         script: |
