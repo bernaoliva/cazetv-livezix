@@ -67,50 +67,54 @@ workflows:
           fi
           cat User.xcconfig
 
-      - name: Build unsigned (sem Apple Developer Program)
+      - name: Archive unsigned (lida com extensions sem colisão)
         script: |
           set -e
           mkdir -p "$BUILD_DIR"
-          # Build pra device iOS REAL (arm64), sem signing — IPA será re-assinado pelo SideStore.
-          # CODE_SIGNING_ALLOWED=NO desativa todo o signing (cert, profile, entitlements).
-          xcodebuild build \
+          ARCHIVE_PATH="$BUILD_DIR/Moblin.xcarchive"
+          # xcodebuild archive empacota .app + Watch + Widgets/Extensions corretamente,
+          # diferente de "build" que dá colisão de output entre Moblin e MoblinWatch.
+          # Build unsigned — SideStore re-assina no iPhone com Apple ID grátis.
+          xcodebuild archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -configuration "$CONFIGURATION" \
-            -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath "$BUILD_DIR" \
+            -archivePath "$ARCHIVE_PATH" \
+            -derivedDataPath "$BUILD_DIR/derived" \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             ENABLE_BITCODE=NO \
-            ONLY_ACTIVE_ARCH=NO \
             DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE="" \
             PROVISIONING_PROFILE_SPECIFIER=""
 
-      - name: Empacotar .app em .ipa (formato Payload/)
+      - name: Empacotar .xcarchive em .ipa (formato Payload/)
         script: |
           set -e
-          APP_PATH="$BUILD_DIR/Build/Products/Release-iphoneos/Moblin.app"
-          if [ ! -d "$APP_PATH" ]; then
-            echo "ERRO: $APP_PATH não encontrado. Lista pasta produtos:"
-            ls -la "$BUILD_DIR/Build/Products/Release-iphoneos/" || true
+          ARCHIVE_APP="$BUILD_DIR/Moblin.xcarchive/Products/Applications/Moblin.app"
+          if [ ! -d "$ARCHIVE_APP" ]; then
+            echo "ERRO: $ARCHIVE_APP não encontrado. Lista do xcarchive:"
+            find "$BUILD_DIR/Moblin.xcarchive" -type d -name "*.app" || true
             exit 1
           fi
           STAGE="$CM_BUILD_DIR/ipa-stage"
           rm -rf "$STAGE"
           mkdir -p "$STAGE/Payload"
-          cp -R "$APP_PATH" "$STAGE/Payload/"
-          # Remove _CodeSignature/ pra ficar realmente unsigned
-          rm -rf "$STAGE/Payload/Moblin.app/_CodeSignature"
+          cp -R "$ARCHIVE_APP" "$STAGE/Payload/"
+          # Remove _CodeSignature/ pra ficar realmente unsigned (SideStore vai re-assinar)
+          find "$STAGE/Payload/Moblin.app" -name "_CodeSignature" -type d -exec rm -rf {} + 2>/dev/null || true
           cd "$STAGE"
           zip -qry "$CM_BUILD_DIR/CazeTV-LiveZix-unsigned.ipa" Payload
           echo "=== IPA gerado ==="
           ls -lh "$CM_BUILD_DIR/CazeTV-LiveZix-unsigned.ipa"
-          # Resumo do bundle pra confirmar branding
+          # Resumo do bundle pra confirmar branding CazéTV
           /usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" "$STAGE/Payload/Moblin.app/Info.plist" || true
           /usr/libexec/PlistBuddy -c "Print :CFBundleName" "$STAGE/Payload/Moblin.app/Info.plist" || true
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$STAGE/Payload/Moblin.app/Info.plist" || true
 
     artifacts:
       - CazeTV-LiveZix-unsigned.ipa
