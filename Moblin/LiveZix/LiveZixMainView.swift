@@ -15,6 +15,7 @@ import SwiftUI
 struct LiveZixMainView: View {
     @EnvironmentObject var model: Model
     @State private var showingSettings = false
+    @State private var didSetup = false
 
     var body: some View {
         ZStack {
@@ -50,6 +51,15 @@ struct LiveZixMainView: View {
                     .padding(.trailing, 18)
                     .padding(.bottom, 22)
                 }
+            }
+        }
+        .onAppear {
+            // CRÍTICO: inicializa câmera/áudio/subsistemas do Moblin. O MainView original
+            // chama model.setup() no onAppear; sem isso a câmera fica preta e qualquer
+            // botão crasha (subsistema não inicializado). Guard pra rodar só 1x.
+            if !didSetup {
+                didSetup = true
+                model.setup()
             }
         }
         .sheet(isPresented: $showingSettings) {

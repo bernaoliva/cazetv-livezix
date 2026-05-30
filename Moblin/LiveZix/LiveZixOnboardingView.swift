@@ -60,11 +60,8 @@ struct LiveZixOnboardingView: View {
         } label: {
             VStack(spacing: 4) {
                 Text("REP \(rep)")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.white)
-                Text(LiveZixConfig.studioName(rep: rep))
-                    .font(.system(size: 11))
-                    .foregroundColor(.gray)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 72)
