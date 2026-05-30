@@ -115,16 +115,27 @@ workflows:
           rm -rf "$STAGE"
           mkdir -p "$STAGE/Payload"
           cp -R "$ARCHIVE_APP" "$STAGE/Payload/"
-          # Remove _CodeSignature/ pra ficar realmente unsigned (SideStore vai re-assinar)
+          # Remove _CodeSignature/ pra ficar realmente unsigned (AltStore re-assina)
           find "$STAGE/Payload/Moblin.app" -name "_CodeSignature" -type d -exec rm -rf {} + 2>/dev/null || true
-          cd "$STAGE"
-          zip -qry "$CM_BUILD_DIR/CazeTV-LiveZix-unsigned.ipa" Payload
-          echo "=== IPA gerado ==="
-          ls -lh "$CM_BUILD_DIR/CazeTV-LiveZix-unsigned.ipa"
-          # Resumo do bundle pra confirmar branding CazéTV
+
+          # Valida o Info.plist ANTES de empacotar (pega corrupção/erro de formato → evita NSCocoaError 3840 no AltStore)
+          echo "=== validando Info.plist ==="
+          plutil -lint "$STAGE/Payload/Moblin.app/Info.plist"
           /usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" "$STAGE/Payload/Moblin.app/Info.plist" || true
           /usr/libexec/PlistBuddy -c "Print :CFBundleName" "$STAGE/Payload/Moblin.app/Info.plist" || true
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$STAGE/Payload/Moblin.app/Info.plist" || true
+
+          # Empacota com ditto (formato de zip que a Apple usa pra .ipa — compatível com AltStore/Sideloadly).
+          # zip -qry produzia archives que o AltStore às vezes rejeita (erro "not in correct format" / 3840).
+          cd "$STAGE"
+          rm -f "$CM_BUILD_DIR/CazeTV-LiveZix-unsigned.ipa"
+          /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload "$CM_BUILD_DIR/CazeTV-LiveZix-unsigned.ipa"
+
+          echo "=== IPA gerado ==="
+          ls -lh "$CM_BUILD_DIR/CazeTV-LiveZix-unsigned.ipa"
+          echo "=== integridade do zip (deve listar Payload/Moblin.app/...) ==="
+          unzip -t "$CM_BUILD_DIR/CazeTV-LiveZix-unsigned.ipa" | head -5
+          unzip -t "$CM_BUILD_DIR/CazeTV-LiveZix-unsigned.ipa" >/dev/null && echo "ZIP OK" || echo "ZIP CORROMPIDO"
 
     artifacts:
       - CazeTV-LiveZix-unsigned.ipa
