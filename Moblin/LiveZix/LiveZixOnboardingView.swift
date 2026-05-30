@@ -110,35 +110,7 @@ struct LiveZixOnboardingView: View {
     }
 
     private func applyCredentials(_ creds: LiveZixCredentials) {
-        let db = model.database
-
-        // 1) Cria/atualiza stream do rep (preserva outros streams existentes)
-        let streamName = "CazéTV — \(LiveZixConfig.studioName(rep: creds.rep))"
-        // Desabilita todos os outros streams
-        for s in db.streams { s.enabled = false }
-        // Procura stream LiveZix existente
-        let existing = db.streams.first(where: { $0.name == streamName })
-        let stream: SettingsStream
-        if let e = existing {
-            stream = e
-        } else {
-            stream = SettingsStream(name: streamName)
-            db.streams.append(stream)
-        }
-        stream.url = creds.srtUrl
-        stream.enabled = true
-        stream.codec = .h264avc
-        stream.resolution = .r1920x1080
-        stream.fps = 60
-        stream.bitrate = 6_000_000      // UInt32 — bitrate de vídeo (NÃO videoBitrate)
-        stream.audioBitrate = 128_000    // Int
-
-        // 2) Configura Remote Control Streamer pra conectar no LiveZix Assistant
-        db.remoteControl.streamer.enabled = true
-        db.remoteControl.streamer.url = creds.assistantUrl
-        db.remoteControl.password = creds.password
-
-        // 3) Aplica stream como ativo
-        model.setCurrentStream(stream: stream)
+        // Aplica tudo (stream + Remote Control) via helper compartilhado.
+        LiveZixApi.applyCredentials(creds, to: model, includeRemoteControl: true)
     }
 }

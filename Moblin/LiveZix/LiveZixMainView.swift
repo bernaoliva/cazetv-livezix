@@ -220,7 +220,31 @@ class LiveZixLiveStatePoller: ObservableObject {
     private func update() {
         guard let m = model else { return }
         let live = m.isLive
-        if isLive != live { isLive = live }
+        if isLive != live {
+            let wasLive = isLive
+            isLive = live
+            // Saiu do ar (true→false): re-busca a config do REP no servidor e re-aplica
+            // (resolução/fps/latência/SRT que o operador mudou no painel). NÃO mexe no
+            // Remote Control pra não derrubar a conexão de controle.
+            if wasLive && !live {
+                reapplyRepConfig(model: m)
+            }
+        }
+    }
+
+    private var reapplying = false
+    private func reapplyRepConfig(model m: Model) {
+        guard !reapplying, let rep = m.database.liveZixSelectedRep else { return }
+        reapplying = true
+        Task { @MainActor in
+            defer { reapplying = false }
+            do {
+                let creds = try await LiveZixApi.fetchCredentials(rep: rep)
+                LiveZixApi.applyCredentials(creds, to: m, includeRemoteControl: false)
+            } catch {
+                // silencioso: se falhar, mantém config atual
+            }
+        }
     }
 }
 
