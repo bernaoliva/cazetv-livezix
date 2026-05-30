@@ -19,8 +19,11 @@ struct LiveZixMainView: View {
 
     var body: some View {
         ZStack {
-            // Background: preview da câmera (reusa view existente do Moblin)
-            CameraPreviewView(model: model)
+            // Background: preview do Moblin. Usar StreamPreviewView (frame processado pela
+            // media engine) e NÃO CameraPreviewView (AVCaptureVideoPreviewLayer cru) — o Moblin
+            // mostra o stream preview por padrão (model.cameraPreview=false); o layer cru fica
+            // preto porque não é alimentado nesse fluxo, mesmo com a captura/transmissão OK.
+            StreamPreviewView(model: model)
                 .ignoresSafeArea()
 
             // Camadas de UI overlaid
