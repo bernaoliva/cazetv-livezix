@@ -11,6 +11,7 @@
 // dentro de subviews ("requires wrapper EnvironmentObject<Model>.Wrapper").
 // Reactivity de live/torch/mic é mantida via @State local sincronizado.
 import SwiftUI
+import UIKit
 
 struct LiveZixMainView: View {
     @EnvironmentObject var model: Model
@@ -64,6 +65,13 @@ struct LiveZixMainView: View {
                 didSetup = true
                 model.setup()
             }
+            // Mantém a tela acesa enquanto o rep está no controle remoto. Sem isso o iOS
+            // bloqueia/suspende o app quando o rep larga o celular — e a conexão de Remote
+            // Control cai, fazendo a central perder o controle. Essencial pro fluxo LiveZix.
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
+        .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = false
         }
         .sheet(isPresented: $showingSettings) {
             NavigationView {
