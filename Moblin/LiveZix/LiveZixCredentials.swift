@@ -11,9 +11,17 @@ struct LiveZixCredentials: Codable {
     let assistantUrl: String     // "ws://livezix.livemode.space:9001/moblin/SRT_LIVEMODE_05"
     let password: String
     // Config persistente editável no painel (tuner.html). Opcionais p/ compat com server antigo.
-    let resolution: String?      // "1920x1080" | "1280x720" | "960x540" | "640x480"
+    let resolution: String?      // "1920x1080" | "1280x720" | "960x540" | "854x480"
     let fps: Int?                // 60 | 50 | 30 | 25
     let latency: Int?            // ms — latência SRT (default 2000)
+    // Config avançada (CONFIGURAÇÕES AVANÇADAS no painel). Aplicadas ao sair do ar.
+    let bitrate: Int?            // kbps — bitrate de vídeo (default 6000)
+    let codec: String?           // "h264" | "h265"
+    let audioBitrate: Int?       // kbps — bitrate de áudio (default 128)
+    let audioCodec: String?      // "aac" | "opus"
+    let keyframe: Int?           // s — intervalo de keyframe (default 2)
+    let adaptive: Bool?          // bitrate adaptativo (default true)
+    let audioOnly: Bool?         // só áudio — previsto, ainda não aplicado (etapa futura)
 
     enum CodingKeys: String, CodingKey {
         case rep
@@ -24,6 +32,13 @@ struct LiveZixCredentials: Codable {
         case resolution
         case fps
         case latency
+        case bitrate
+        case codec
+        case audioBitrate = "audio_bitrate"
+        case audioCodec = "audio_codec"
+        case keyframe
+        case adaptive
+        case audioOnly = "audio_only"
     }
 }
 
@@ -91,16 +106,22 @@ class LiveZixApi {
         }
         stream.url = creds.srtUrl
         stream.enabled = true
-        stream.codec = .h264avc
+        // Vídeo: codec/resolução/fps/bitrate/keyframe/adaptive vindos do painel (com fallback).
+        stream.codec = (creds.codec == "h265") ? .h265hevc : .h264avc
         if let r = creds.resolution, let res = SettingsStreamResolution(rawValue: r) {
             stream.resolution = res
         } else {
             stream.resolution = .r1920x1080
         }
         stream.fps = creds.fps ?? 60
-        stream.bitrate = 6_000_000
-        stream.audioBitrate = 128_000
+        stream.bitrate = UInt32(creds.bitrate ?? 6000) * 1000
+        stream.maxKeyFrameInterval = Int32(creds.keyframe ?? 2)
+        stream.adaptiveBitrate = creds.adaptive ?? true
+        // Áudio: bitrate + codec do painel (canais não é setting limpo no Moblin → fora).
+        stream.audioBitrate = (creds.audioBitrate ?? 128) * 1000
+        stream.audioCodec = (creds.audioCodec == "opus") ? .opus : .aac
         stream.srt.latency = Int32(creds.latency ?? 2000)
+        // creds.audioOnly: previsto p/ etapa futura (gate de vídeo no muxer) — ainda inerte.
         if includeRemoteControl {
             db.remoteControl.streamer.enabled = true
             db.remoteControl.streamer.url = creds.assistantUrl

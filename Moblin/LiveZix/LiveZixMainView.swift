@@ -48,7 +48,7 @@ struct LiveZixMainView: View {
         }
         .sheet(isPresented: $showingSettings) {
             NavigationView {
-                LiveZixSimpleSettingsView()
+                LiveZixSettingsView()
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
