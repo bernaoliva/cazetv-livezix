@@ -698,6 +698,10 @@ final class Model: NSObject, ObservableObject, @unchecked Sendable {
     override init() {
         super.init()
         settings.load()
+        // LiveZix: app dedicado sempre inicia no modo simplificado. O Moblin completo
+        // é alcançável por navegação (hub → "Tudo"), não por flag persistente — isso
+        // destrava quem tivesse ficado preso em liveZixMode=false em builds antigos.
+        settings.database.liveZixMode = true
         streamingHistory.load()
         replaysStorage.load()
         setCurrentStream()
