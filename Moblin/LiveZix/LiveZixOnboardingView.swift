@@ -44,6 +44,19 @@ struct LiveZixOnboardingView: View {
                 }
 
                 Spacer()
+
+                // Modo demonstração — entra na interface da câmera sem servidor/central.
+                // Serve pra avaliação (App Review) e pra testar o app offline.
+                Button {
+                    enterDemoMode()
+                } label: {
+                    Text("Entrar em modo demonstração")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                        .underline()
+                }
+                .disabled(isLoading)
+                .padding(.bottom, 4)
                 Text("Suas credenciais são geradas pelo servidor LiveZix.\nA configuração é feita uma vez só.")
                     .font(.system(size: 11))
                     .foregroundColor(.gray)
@@ -114,5 +127,17 @@ struct LiveZixOnboardingView: View {
     private func applyCredentials(_ creds: LiveZixCredentials) {
         // Aplica tudo (stream + Remote Control) via helper compartilhado.
         LiveZixApi.applyCredentials(creds, to: model, includeRemoteControl: true)
+    }
+
+    /// Modo demonstração: abre a interface da câmera sem buscar credenciais nem
+    /// conectar na central. Permite avaliar o app (App Review) e testar offline.
+    private func enterDemoMode() {
+        // Não conecta Remote Control (sem central) e não fixa rep (config persistente off).
+        model.database.remoteControl.streamer.enabled = false
+        model.database.liveZixSelectedRep = nil
+        model.storeSettings()
+        model.reloadConnections()
+        // Sessão em memória → router troca pra LiveZixMainView (câmera). Some no kill do app.
+        model.liveZixActiveRep = 0
     }
 }
