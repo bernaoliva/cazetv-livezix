@@ -96,11 +96,13 @@ struct LiveZixOnboardingView: View {
             let creds = try await LiveZixApi.fetchCredentials(rep: rep)
             await MainActor.run {
                 applyCredentials(creds)
-                // Marca rep escolhido — MoblinApp router troca pra LiveZixMainView
+                // Persistido (qual rep p/ config + re-apply ao sair do ar)
                 model.database.liveZixSelectedRep = rep
                 model.storeSettings()
                 // Reconecta tudo: stream novo + remote control
                 model.reloadConnections()
+                // Sessão em memória → router troca pra LiveZixMainView. Some no kill do app.
+                model.liveZixActiveRep = rep
             }
         } catch {
             await MainActor.run {

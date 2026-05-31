@@ -18,7 +18,10 @@ struct MoblinApp: App {
             // Se rep ativou "Avançado" nas Settings (liveZixMode=false), mostra Moblin completo.
             Group {
                 if model.database.liveZixMode {
-                    if model.database.liveZixSelectedRep == nil {
+                    // Routing pela SESSÃO em memória (liveZixActiveRep), não pelo valor persistido.
+                    // Kill do app → liveZixActiveRep volta a nil → pede REP de novo.
+                    // Background→foreground → mantém (processo vivo).
+                    if model.liveZixActiveRep == nil {
                         LiveZixOnboardingView()
                     } else {
                         LiveZixMainView()

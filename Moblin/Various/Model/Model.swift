@@ -361,6 +361,10 @@ class CameraLevel: ObservableObject {
 @MainActor
 final class Model: NSObject, ObservableObject, @unchecked Sendable {
     @AppStorage("enterForegroundCount") var enterForegroundCount = 0
+    // LiveZix: rep ativo NA SESSÃO atual (memória, NÃO persistido). Controla o routing:
+    // nil → tela de seleção de REP. Como o Model é recriado no cold launch, fechar o app
+    // (kill) volta pro onboarding; ir pra background e voltar mantém (processo vivo).
+    @Published var liveZixActiveRep: Int?
     @Published var showingPanel: ShowingPanel = .none
     @Published var panelHidden = false
     @Published var showStealthMode = false

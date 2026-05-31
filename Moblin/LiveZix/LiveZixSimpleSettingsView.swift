@@ -155,6 +155,7 @@ struct LiveZixSimpleSettingsView: View {
             Button("Voltar pra tela de seleção", role: .destructive) {
                 model.database.liveZixSelectedRep = nil
                 model.storeSettings()
+                model.liveZixActiveRep = nil   // router volta pro onboarding
             }
             Button("Cancelar", role: .cancel) {}
         } message: {
