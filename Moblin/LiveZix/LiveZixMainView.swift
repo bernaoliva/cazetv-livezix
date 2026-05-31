@@ -26,10 +26,15 @@ struct LiveZixMainView: View {
                         .onEnded { amount in model.commitZoomX(amount: Float(amount)) }
                 )
 
+            // Status no topo.
             VStack(spacing: 0) {
                 LiveZixTopBar(model: model)
                 Spacer()
-                LiveZixBottomBar(model: model, onSettings: { showingSettings = true })
+            }
+            // Ações na lateral direita (coluna vertical, ícones compactos).
+            HStack(spacing: 0) {
+                Spacer()
+                LiveZixSideBar(model: model, onSettings: { showingSettings = true })
             }
         }
         .onAppear {
@@ -108,8 +113,8 @@ struct LiveZixServerStatusBar: View {
     }
 }
 
-// ─── Barra inferior — 4 ações ─────────────────────────────────────────────
-private struct LiveZixBottomBar: View {
+// ─── Barra lateral direita — 4 ações (ícones compactos) ───────────────────
+private struct LiveZixSideBar: View {
     let model: Model
     let onSettings: () -> Void
     @ObservedObject private var live = LiveZixLiveStatePoller.shared
@@ -117,7 +122,7 @@ private struct LiveZixBottomBar: View {
     @State private var presentingStopConfirm = false
 
     var body: some View {
-        HStack(alignment: .center, spacing: 0) {
+        VStack(alignment: .center, spacing: 15) {
             actionButton(system: "camera.rotate", label: "Câmera") {
                 liveZixToggleCamera()
             }
@@ -129,13 +134,13 @@ private struct LiveZixBottomBar: View {
             transmitButton()
             actionButton(system: "gearshape.fill", label: "Config", action: onSettings)
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 14)
-        .padding(.bottom, 26)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 11)
         .background(
-            LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
+            RoundedRectangle(cornerRadius: 22)
+                .fill(Color.black.opacity(0.32))
         )
+        .padding(.trailing, 12)
         .onAppear { torchOn = model.streamOverlay.isTorchOn }
     }
 
@@ -144,22 +149,21 @@ private struct LiveZixBottomBar: View {
     private func actionButton(system: String, label: String, tint: Color = .white,
                               action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 Image(systemName: system)
-                    .font(.system(size: 23))
+                    .font(.system(size: 17))
                     .foregroundColor(tint)
-                    .frame(width: 56, height: 56)
+                    .frame(width: 44, height: 44)
                     .background(Color.white.opacity(0.12))
                     .clipShape(Circle())
                 Text(label)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 9, weight: .medium))
                     .foregroundColor(.white.opacity(0.85))
             }
-            .frame(maxWidth: .infinity)
         }
     }
 
-    // Botão TRANSMITIR — destaque central, estilo gravação (círculo vermelho / quadrado p/ parar)
+    // Botão TRANSMITIR — destaque, estilo gravação (círculo vermelho / quadrado p/ parar)
     @ViewBuilder
     private func transmitButton() -> some View {
         Button {
@@ -169,21 +173,20 @@ private struct LiveZixBottomBar: View {
                 model.startStream()
             }
         } label: {
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 ZStack {
                     Circle()
-                        .stroke(Color.white.opacity(0.9), lineWidth: 4)
-                        .frame(width: 74, height: 74)
-                    RoundedRectangle(cornerRadius: live.isLive ? 6 : 33)
+                        .stroke(Color.white.opacity(0.9), lineWidth: 3)
+                        .frame(width: 56, height: 56)
+                    RoundedRectangle(cornerRadius: live.isLive ? 5 : 25)
                         .fill(Color.red)
-                        .frame(width: live.isLive ? 30 : 60, height: live.isLive ? 30 : 60)
+                        .frame(width: live.isLive ? 22 : 44, height: live.isLive ? 22 : 44)
                         .animation(.easeInOut(duration: 0.2), value: live.isLive)
                 }
                 Text(live.isLive ? "PARAR" : "TRANSMITIR")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 9, weight: .bold))
                     .foregroundColor(live.isLive ? .red : .white)
             }
-            .frame(maxWidth: .infinity)
         }
         .confirmationDialog("Parar transmissão?", isPresented: $presentingStopConfirm, titleVisibility: .visible) {
             Button("Parar", role: .destructive) { _ = model.stopStream() }
