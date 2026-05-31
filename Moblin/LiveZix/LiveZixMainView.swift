@@ -13,6 +13,10 @@ struct LiveZixMainView: View {
     @EnvironmentObject var model: Model
     @State private var showingSettings = false
     @State private var didSetup = false
+    // Indicador de zoom (ex.: "2.3x") enquanto pinça.
+    @State private var zoomText = ""
+    @State private var showZoom = false
+    @State private var zoomHideWork: DispatchWorkItem?
 
     var body: some View {
         ZStack {
@@ -22,9 +26,26 @@ struct LiveZixMainView: View {
                 // Zoom por pinça (padrão 1x). Reusa o pinch nativo do Moblin.
                 .gesture(
                     MagnificationGesture()
-                        .onChanged { amount in model.changeZoomX(amount: Float(amount)) }
-                        .onEnded { amount in model.commitZoomX(amount: Float(amount)) }
+                        .onChanged { amount in
+                            model.changeZoomX(amount: Float(amount))
+                            flashZoom()
+                        }
+                        .onEnded { amount in
+                            model.commitZoomX(amount: Float(amount))
+                            flashZoom()
+                        }
                 )
+
+            // Indicador de zoom — aparece centralizado enquanto/depois de pinçar.
+            if showZoom {
+                Text(zoomText)
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 18).padding(.vertical, 9)
+                    .background(.black.opacity(0.45), in: Capsule())
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
 
             // Status no topo.
             VStack(spacing: 0) {
@@ -63,6 +84,18 @@ struct LiveZixMainView: View {
             }
             .environmentObject(model)
         }
+    }
+
+    // Mostra o nível de zoom atual (model.zoom.x) e some ~1s após parar de pinçar.
+    private func flashZoom() {
+        zoomText = String(format: "%.1fx", model.zoom.x)
+        withAnimation(.easeOut(duration: 0.15)) { showZoom = true }
+        zoomHideWork?.cancel()
+        let work = DispatchWorkItem {
+            withAnimation(.easeIn(duration: 0.3)) { showZoom = false }
+        }
+        zoomHideWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: work)
     }
 }
 
