@@ -34,6 +34,19 @@ struct LiveZixCredentials: Codable {
     let srtMaxBwFollowInput: Bool? // seguir banda da entrada
     let srtAdaptive: Bool?       // bitrate adaptativo SRT
     let srtBigPackets: Bool?     // pacotes grandes (MTU)
+    // Câmera
+    let camStabilization: String? // "off"|"standard"|"cinematic"|"cinematic_enhanced"
+    let camColorSpace: String?   // "srgb"|"p3"|"hlg"|"applelog"
+    let camMirrorFront: Bool?    // espelhar câmera frontal na transmissão
+    let camTapFocus: Bool?       // tocar na tela pra focar
+    let camFixedHorizon: Bool?   // horizonte fixo
+    // Display / overlay
+    let showLocation: Bool?
+    let showSpeed: Bool?
+    let showUptime: Bool?
+    let showBitrate: Bool?
+    let showAudio: Bool?
+    let showZoom: Bool?
     // Outras
     let timecodes: Bool?         // timecodes (requer H.265)
     let viewerDelay: Float?      // s — atraso estimado do espectador
@@ -65,6 +78,17 @@ struct LiveZixCredentials: Codable {
         case srtMaxBwFollowInput = "srt_max_bw_follow_input"
         case srtAdaptive = "srt_adaptive"
         case srtBigPackets = "srt_big_packets"
+        case camStabilization = "cam_stabilization"
+        case camColorSpace = "cam_color_space"
+        case camMirrorFront = "cam_mirror_front"
+        case camTapFocus = "cam_tap_focus"
+        case camFixedHorizon = "cam_fixed_horizon"
+        case showLocation = "show_location"
+        case showSpeed = "show_speed"
+        case showUptime = "show_uptime"
+        case showBitrate = "show_bitrate"
+        case showAudio = "show_audio"
+        case showZoom = "show_zoom"
         case timecodes
         case viewerDelay = "viewer_delay"
         case backgroundStreaming = "background_streaming"
@@ -166,6 +190,19 @@ class LiveZixApi {
         stream.srt.maximumBandwidthFollowInput = creds.srtMaxBwFollowInput ?? true
         stream.srt.adaptiveBitrateEnabled = creds.srtAdaptive ?? true
         stream.srt.bigPackets = creds.srtBigPackets ?? true
+        // ── Câmera (campos globais do Database) ──
+        if let s = creds.camStabilization { db.videoStabilizationMode = stabilizationFrom(s) }
+        if let c = creds.camColorSpace { db.color.space = colorSpaceFrom(c) }
+        db.mirrorFrontCameraOnStream = creds.camMirrorFront ?? true
+        db.tapToFocus = creds.camTapFocus ?? false
+        db.fixedHorizon = creds.camFixedHorizon ?? false
+        // ── Display / overlay (o que aparece na imagem) ──
+        if let v = creds.showLocation { db.show.location = v }
+        if let v = creds.showSpeed { db.show.speed = v }
+        if let v = creds.showUptime { db.show.uptime = v }
+        if let v = creds.showBitrate { db.show.stream = v }
+        if let v = creds.showAudio { db.show.audioLevel = v }
+        if let v = creds.showZoom { db.show.zoom = v }
         // ── Outras ──
         stream.timecodesEnabled = creds.timecodes ?? false
         stream.estimatedViewerDelay = creds.viewerDelay ?? 8.0
@@ -184,4 +221,22 @@ class LiveZixApi {
     private static func rateControlRaw(_ s: String) -> String { s.uppercased() }
     // "baseline"/"main"/"high" → rawValue ("Baseline"/"Main"/"High").
     private static func h264ProfileRaw(_ s: String) -> String { s.prefix(1).uppercased() + s.dropFirst() }
+
+    private static func stabilizationFrom(_ s: String) -> SettingsVideoStabilizationMode {
+        switch s {
+        case "standard": return .standard
+        case "cinematic": return .cinematic
+        case "cinematic_enhanced": return .cinematicExtendedEnhanced
+        default: return .off
+        }
+    }
+
+    private static func colorSpaceFrom(_ s: String) -> SettingsColorSpace {
+        switch s {
+        case "p3": return .p3D65
+        case "hlg": return .hlgBt2020
+        case "applelog": return .appleLog
+        default: return .srgb
+        }
+    }
 }
